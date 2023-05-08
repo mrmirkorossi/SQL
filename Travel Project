@@ -1,0 +1,130 @@
+-------------------------------------------------- -----
+--DATA CLEANING
+-------------------------------------------------- -----
+
+--TABLE#1 - COUNTRIES
+-- I rename the countriesregions table to countries
+ALTER TABLE countriesregions RENAME TO countries;
+  --Rename the code field to country_id and name to country_name
+ALTER TABLE countries RENAME country_code to country_id;
+ALTER TABLE countries RENAME name to country_name;
+--I delete the alpha_3 and iso_3166_2 fields
+ALTER TABLE countries
+DROP COLUMN alpha_3,
+DROP COLUMN iso_3166_2;
+--I insert two nations present in flights but not in countries
+INSERT INTO countries (country_id, country_name, region, sub_region)
+VALUES ('AN', 'Netherlands Antilles', 'Americas', 'Caribbean'),
+('KV', 'Kosovo', 'Europe', 'Southern Europe'),
+('WW', 'Worldwide Caution', null, null),
+('SP', 'South Pacific Cyclone Season', 'Asia', 'South-Eastern Asia')
+--Set the primary key
+ALTER TABLE countries ADD PRIMARY KEY (country_id);
+
+--TABLE#2 - FLIGHTS
+-- Rename the btsoriginus table to flights
+ALTER TABLE btsoriginus RENAME TO flights;
+-- I rename the x field to flight_record, dest_country to country_code and yearmonth to date
+ALTER TABLE flights RENAME x to flight_record;
+ALTER TABLE flights RENAME dest_country to country_id;
+ALTER TABLE flights RENAME yearmonth to date;
+--Delete the column_a, origin_country, year and month fields
+ALTER TABLE flights
+DROP COLUMN column_a,
+DROP COLUMN origin_country,
+DROP COLUMN year,
+DROP COLUMN month;
+-- Change the data type of yearmonth to date
+ALTER TABLE flights ALTER COLUMN date TYPE date
+using to_date(date, 'YYYY-MM');
+--Delete null fields
+DELETE
+FROM flights
+WHERE flight_record is null;
+--Set the primary key
+ALTER TABLE flights ADD PRIMARY KEY (flight_record);
+--Set the foreign key
+ALTER TABLE flights
+add constraint fk_flights_countries
+FOREIGN KEY (country_id)
+REFERENCES countries(country_id);
+
+--TABLE#3 - WARNINGS
+-- Rename the sdwarnings table to warnings
+ALTER TABLE warnings RENAME TO warnings;
+-- I rename the title field to country_name
+ALTER TABLE warnings RENAME title to country_name;
+-- Rename the pub_date field to date
+ALTER TABLE warnings RENAME pub_date to date;
+--I remove the country, link and description fields
+ALTER TABLE warnings
+DROP COLUMN country,
+DROP COLUMN links,
+DROP COLUMN description;
+-- Change the data type of date to warnings
+ALTER TABLE warnings ALTER COLUMN date TYPE date using date::date;
+--Remove the words "Travel Warning" from all country_name records
+UPDATE warnings
+SET country_name = regexp_replace(country_name, 'Travel Warning', '', 'gi');
+--Strip dates from all country_name records that have them
+UPDATE warnings
+SET country_name = btrim (country_name, '-/0123456789');
+--I standardize the values of the country_name field
+update warnings
+set country_name = 'Russia'
+where country_name like 'Russia%'
+update warnings
+set country_name = 'Egypt'
+where country_name like 'Egypt%'
+update warnings
+set country_name = 'Madagascar'
+where country_name like 'Madagascar%'
+update warnings
+set country_name = 'Thailand'
+where country_name like 'Thailand%'
+update warnings
+set country_name = 'Côte d''Ivoire'
+where country_name like '%Ivoire'
+update warnings
+set country_name = 'Congo (Democratic Republic of the)'
+where country_name like '%Congo%'
+update warnings
+set country_name = 'Israel'
+where country_name like '%Israel%'
+update warnings
+set country_name = 'North Korea'
+where country_name like 'Democratic People''s Republic of Korea (North Korea)'
+update warnings
+set country_name = 'South Sudan'
+where country_name like 'Republic of South Sudan'
+--I insert country_id field in warnings
+ALTER TABLE warnings ADD country_id varchar(50);
+--Copying country_id to warnings
+update warnings
+set country_id = countries.country_id
+from countries
+where warnings.country_name = countries.country_name
+--Removing the country_name field as redundant in the database
+alter table warnings
+drop column country_name;
+--Create the warning_record field and set it as a primary key that autoincrements
+alter table warnings add column warning_record INTEGER generated always as identity primary key
+--Set the foreign key
+ALTER TABLE warnings
+add constraint fk_warnings_countries
+FOREIGN KEY (country_id)
+REFERENCES countries(country_id);
+
+--TABLE#4 - DEATHS_ABROAD
+-- Rename the sdamerican_deaths_abroad table to deaths_abroad
+ALTER TABLE sdamerican_deaths_abroad RENAME TO deaths_abroad;
+  --Rename the country field of the deaths_abroad table to country_name
+ALTER TABLE deaths_abroad RENAME country to country_name;
+-- Change the data type of date to deaths_abroad
+ALTER TABLE deaths_abroad ALTER COLUMN date TYPE date
+using to_date(date, 'YYYY-MM-DD');
+--I create the death_record field and set it as a primary key that autoincrements
+alter table deaths_abroad add column death_record INTEGER generated always as identity primary key
+--I standardize the cause_of_death field
+update deaths_abroad
+set cause_of_death = 'Other Accident'
