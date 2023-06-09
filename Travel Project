@@ -6,7 +6,7 @@
 -- I rename the countriesregions table to countries
 ALTER TABLE countriesregions RENAME TO countries;
   --Rename the code field to country_id and name to country_name
-ALTER TABLE countries RENAME country_code to country_id;
+ALTER TABLE countries RENAME alpha_2 to country_id;
 ALTER TABLE countries RENAME name to country_name;
 --I delete the alpha_3 and iso_3166_2 fields
 ALTER TABLE countries
