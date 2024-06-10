@@ -1,130 +1,486 @@
--------------------------------------------------- -----
+-------------------------------------------------------
 --DATA CLEANING
--------------------------------------------------- -----
+-------------------------------------------------------
 
 --TABLE#1 - COUNTRIES
--- I rename the countriesregions table to countries
+-- Renaming the table countriesregions to countries
 ALTER TABLE countriesregions RENAME TO countries;
-  --Rename the code field to country_id and name to country_name
+-- Renaming the field country_code to country_id and name to country_name
 ALTER TABLE countries RENAME alpha_2 to country_id;
 ALTER TABLE countries RENAME name to country_name;
---I delete the alpha_3 and iso_3166_2 fields
+-- Dropping the fields alpha_3 and iso_3166_2
 ALTER TABLE countries
+DROP column country_code,
 DROP COLUMN alpha_3,
 DROP COLUMN iso_3166_2;
---I insert two nations present in flights but not in countries
+-- Inserting two countries present in flights but not in countries
 INSERT INTO countries (country_id, country_name, region, sub_region)
 VALUES ('AN', 'Netherlands Antilles', 'Americas', 'Caribbean'),
-('KV', 'Kosovo', 'Europe', 'Southern Europe'),
-('WW', 'Worldwide Caution', null, null),
-('SP', 'South Pacific Cyclone Season', 'Asia', 'South-Eastern Asia')
---Set the primary key
+                ('KV', 'Kosovo', 'Europe', 'Southern Europe'),
+                ('WW', 'Worldwide Caution', null, null),
+                ('SP', 'South Pacific Cyclone Season', 'Asia', 'South-Eastern Asia')
+-- Setting the primary key
 ALTER TABLE countries ADD PRIMARY KEY (country_id);
 
 --TABLE#2 - FLIGHTS
--- Rename the btsoriginus table to flights
+-- Importing btsoriginus and btsoriginus_10_09_to_06_16
+-- Renaming the table btsoriginus to flights
 ALTER TABLE btsoriginus RENAME TO flights;
--- I rename the x field to flight_record, dest_country to country_code and yearmonth to date
+-- Renaming the field x to flight_record, dest_country to country_code, and yearmonth to date
 ALTER TABLE flights RENAME x to flight_record;
 ALTER TABLE flights RENAME dest_country to country_id;
 ALTER TABLE flights RENAME yearmonth to date;
---Delete the column_a, origin_country, year and month fields
+-- Dropping the fields column_a, origin_country, year, and month
 ALTER TABLE flights
 DROP COLUMN column_a,
 DROP COLUMN origin_country,
 DROP COLUMN year,
 DROP COLUMN month;
--- Change the data type of yearmonth to date
+-- Changing the data type of date to date
 ALTER TABLE flights ALTER COLUMN date TYPE date
 using to_date(date, 'YYYY-MM');
---Delete null fields
+-- Deleting null records
 DELETE
 FROM flights
 WHERE flight_record is null;
---Set the primary key
+-- Deleting duplicate records between btsoriginus and btsoriginus_10_09_to_06_16
+WITH duplicates AS (
+    SELECT ctid, 
+           ROW_NUMBER() OVER (PARTITION BY flight_record ORDER BY ctid) AS rnum
+    FROM flights
+)
+DELETE FROM flights
+WHERE ctid IN (
+    SELECT ctid
+    FROM duplicates
+    WHERE rnum > 1
+);
+-- Setting the primary key
 ALTER TABLE flights ADD PRIMARY KEY (flight_record);
---Set the foreign key
+-- Setting the foreign key
 ALTER TABLE flights
 add constraint fk_flights_countries
 FOREIGN KEY (country_id)
 REFERENCES countries(country_id);
 
 --TABLE#3 - WARNINGS
--- Rename the sdwarnings table to warnings
-ALTER TABLE warnings RENAME TO warnings;
--- I rename the title field to country_name
+-- Renaming the table sdwarnings to warnings
+ALTER TABLE sdwarnings RENAME TO warnings;
+-- Renaming the field title to country_name
 ALTER TABLE warnings RENAME title to country_name;
--- Rename the pub_date field to date
+-- Renaming the field pub_date to date
 ALTER TABLE warnings RENAME pub_date to date;
---I remove the country, link and description fields
+-- Dropping the fields country, link, and description
 ALTER TABLE warnings
 DROP COLUMN country,
-DROP COLUMN links,
+DROP COLUMN link,
 DROP COLUMN description;
--- Change the data type of date to warnings
+-- Changing the data type of date to date
 ALTER TABLE warnings ALTER COLUMN date TYPE date using date::date;
---Remove the words "Travel Warning" from all country_name records
+-- Removing the words "Travel Warning" from all records of country_name
 UPDATE warnings
 SET country_name = regexp_replace(country_name, 'Travel Warning', '', 'gi');
---Strip dates from all country_name records that have them
+-- Removing dates from all records of country_name that possess them
 UPDATE warnings
-SET country_name = btrim (country_name, '-/0123456789');
---I standardize the values of the country_name field
+SET country_name = btrim (country_name, ' -/0123456789');
 update warnings
 set country_name = 'Russia'
-where country_name like 'Russia%'
+where country_name like 'Russia%';
 update warnings
 set country_name = 'Egypt'
-where country_name like 'Egypt%'
+where country_name like 'Egypt%';
 update warnings
 set country_name = 'Madagascar'
-where country_name like 'Madagascar%'
+where country_name like 'Madagascar%';
 update warnings
 set country_name = 'Thailand'
-where country_name like 'Thailand%'
+where country_name like 'Thailand%';
 update warnings
 set country_name = 'Côte d''Ivoire'
-where country_name like '%Ivoire'
+where country_name like '%Ivoire';
 update warnings
 set country_name = 'Congo (Democratic Republic of the)'
-where country_name like '%Congo%'
+where country_name like '%Congo%';
 update warnings
 set country_name = 'Israel'
-where country_name like '%Israel%'
+where country_name like '%Israel%';
 update warnings
 set country_name = 'North Korea'
-where country_name like 'Democratic People''s Republic of Korea (North Korea)'
+where country_name like 'Democratic People''s Republic of Korea (North Korea)';
 update warnings
 set country_name = 'South Sudan'
-where country_name like 'Republic of South Sudan'
---I insert country_id field in warnings
+where country_name like 'Republic of South Sudan';
+-- Adding the field country_id in warnings
 ALTER TABLE warnings ADD country_id varchar(50);
---Copying country_id to warnings
+-- Copying country_id in warnings
 update warnings
 set country_id = countries.country_id
 from countries
-where warnings.country_name = countries.country_name
---Removing the country_name field as redundant in the database
+where warnings.country_name = countries.country_name;
+-- Dropping the field country_name as it is redundant in the database
 alter table warnings
 drop column country_name;
---Create the warning_record field and set it as a primary key that autoincrements
-alter table warnings add column warning_record INTEGER generated always as identity primary key
---Set the foreign key
+-- Creating the field warning_record and setting it as an auto-increment primary key
+alter table warnings add column warning_record INTEGER generated always as identity primary key;
+-- Setting the foreign key
 ALTER TABLE warnings
 add constraint fk_warnings_countries
 FOREIGN KEY (country_id)
 REFERENCES countries(country_id);
 
 --TABLE#4 - DEATHS_ABROAD
--- Rename the sdamerican_deaths_abroad table to deaths_abroad
+-- Renaming the table sdamerican_deaths_abroad to deaths_abroad
 ALTER TABLE sdamerican_deaths_abroad RENAME TO deaths_abroad;
-  --Rename the country field of the deaths_abroad table to country_name
+-- Renaming the field country in the table deaths_abroad to country_name
 ALTER TABLE deaths_abroad RENAME country to country_name;
--- Change the data type of date to deaths_abroad
+-- Changing the data type of date in deaths_abroad
 ALTER TABLE deaths_abroad ALTER COLUMN date TYPE date
 using to_date(date, 'YYYY-MM-DD');
---I create the death_record field and set it as a primary key that autoincrements
-alter table deaths_abroad add column death_record INTEGER generated always as identity primary key
---I standardize the cause_of_death field
+-- Creating the field death_record and setting it as an auto-increment primary key
+alter table deaths_abroad add column death_record INTEGER generated always as identity primary key;
+-- Standardizing the field cause_of_death
 update deaths_abroad
 set cause_of_death = 'Other Accident'
+where cause_of_death like 'Other%';
+update deaths_abroad
+set cause_of_death = 'Homicide'
+where cause_of_death like '_omicide';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Auto'
+where cause_of_death like '%Auto%';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Bus'
+where cause_of_death like '%Bus%';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Pedestrian'
+where cause_of_death like '%Pedest%';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Train'
+where cause_of_death like '%Train%';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Motorcycle'
+where cause_of_death like '%Motorc%';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Bike'
+where cause_of_death LIKE '%bike';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Other'
+where cause_of_death = 'Vehicle Accident - Other';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Other'
+where cause_of_death = 'Veh. Accid- Other';
+update deaths_abroad
+set cause_of_death = 'Veh.Accid - Other'
+where cause_of_death = 'Veh. Accid-Other';
+-- Standardizing the field country_name
+update deaths_abroad
+set country_name = 'Bosnia and Herzegovina'
+where country_name like 'Bosnia%';
+update deaths_abroad
+set country_name = 'Tanzania, United Republic of'
+where country_name like 'Tanzania%';
+update deaths_abroad
+set country_name = 'South Korea'
+where country_name like '%Korea%';
+update deaths_abroad
+set country_name = 'Israel'
+where country_name like 'Jerusalem%';
+-- Adding the field country_id in deaths_abroad
+ALTER TABLE deaths_abroad ADD country_id varchar(50);
+-- Copying country_id in deaths_abroad
+update deaths_abroad
+set country_id = countries.country_id
+from countries
+where deaths_abroad.country_name = countries.country_name;
+-- Dropping the field country_name as it is redundant in the database
+alter table deaths_abroad
+drop column country_name;
+-- Setting the foreign key
+ALTER TABLE deaths_abroad
+add constraint fk_deaths_abroad_countries
+FOREIGN KEY (country_id)
+REFERENCES countries(country_id);
+
+--TABLES REMOVAL
+-- Dropping the table deathbutnowarningpc as its records are present in deathpercapita
+DROP TABLE deathbutnowarningpc;
+-- Dropping the table deathsranking_csv because it is the result of a query on the deathpercapita table
+DROP TABLE deathsranking_csv;
+-- Dropping the tables warningbutnotdeathpc and warningsanddeathspc because they are the result of queries
+-- between the tables warnings and deathpercapita and therefore contain data already present elsewhere in the database
+DROP TABLE warningbutnodeathpc;
+DROP TABLE warningsanddeathspc;
+-- Dropping the table warningsranking because it is the result of a query on the warnings table
+DROP TABLE warningsranking;
+-- Dropping the table btscountrycodes because it is a clone of countries
+DROP TABLE btscountrycodes;
+-- Dropping the table deathspercapita as it contains aggregated data already derived from the raw data present
+DROP TABLE deathspercapita;
+-- Dropping the table travelafterwarning as it contains percentage data without specifics
+DROP TABLE travelafterwarning;
+-------------------------------------------------------
+--DATA ANALYSIS
+-------------------------------------------------------
+--1 Identifying the most visited countries
+select c.country_name, sum (passengers) as tot_passengers,
+round(sum(passengers)*100/sum(sum(passengers)) over (),2) AS pct_passengers
+from flights f
+left join countries c
+on f.country_id = c.country_id
+group by country_name
+order by pct_passengers desc;
+
+--Calculating the percentage of warnings for each country
+select c.country_name, sum (warning_record) as tot_warnings,
+round(sum(warning_record)*100/sum(sum(warning_record)) over (),2) as pct_warnings
+from warnings w
+left join countries c
+on w.country_id = c.country_id
+group by country_name
+order by pct_warnings desc;
+
+--2 Identifying the most dangerous countries according to DOS
+select c.country_name, sum (warning_record) as tot_warnings
+from warnings w
+left join countries c
+on w.country_id = c.country_id
+group by country_name
+order by tot_warnings desc;
+
+--3 Identifying the safest countries according to DOS
+select c.country_name, sum (warning_record) as tot_warnings
+from warnings w
+left join countries c
+on w.country_id = c.country_id
+group by country_name
+order by tot_warnings asc;
+
+--4 Ranking countries by mortality rate
+with
+totaldeaths as(
+select deaths_abroad.country_id, count (death_record) as deaths
+from deaths_abroad
+group by deaths_abroad.country_id
+having count (death_record)>0
+order by deaths desc),
+totalpass as(
+select f.country_id, sum (passengers) as pass
+from flights f
+group by f.country_id
+having sum (passengers)>300000
+order by pass desc)
+select c.country_name, deaths, pass, round((deaths*100000.0/pass),2) as deaths_per_100kpass
+from totaldeaths
+join totalpass
+on totaldeaths.country_id = totalpass.country_id
+join countries c
+on totaldeaths.country_id = c.country_id
+group by c.country_name, totaldeaths.deaths, totalpass.pass
+order by deaths_per_100kpass desc;
+
+--5 Comparing mortality and warnings by country
+with
+totaldeaths as(
+select deaths_abroad.country_id, count (death_record) as deaths
+from deaths_abroad
+group by deaths_abroad.country_id
+having count (death_record)>0
+order by deaths desc),
+totalpass as(
+select f.country_id, sum (passengers) as pass
+from flights f
+group by f.country_id
+having sum (passengers)>300000
+order by pass desc),
+totalwarnings as(
+select w.country_id, sum (warning_record) as totwarnings
+from warnings w
+group by w.country_id)
+select c.country_name, round((deaths*100000.0/pass),2) as deaths_per_100kpass,
+sum (warning_record) as warnings
+from
+totaldeaths
+join totalpass
+on totaldeaths.country_id = totalpass.country_id
+join
+warnings w
+on totaldeaths.country_id = w.country_id
+join countries c
+on totaldeaths.country_id = c.country_id
+group by c.country_name, totaldeaths.deaths, totalpass.pass
+order by warnings desc;
+
+--6 Comparing deaths and warnings by season
+with w1 as (with w as (select date, warning_record from warnings)
+select
+case
+when w.date between
+make_date(extract(year from w.date)::int, 3, 21)
+and
+make_date(extract(year from w.date)::int, 6, 20)
+then 'Spring'
+when w.date between
+make_date(extract(year from w.date)::int, 6, 21)
+and
+make_date(extract(year from w.date)::int, 9, 22)
+then 'Summer'
+when w.date between
+make_date(extract(year from w.date)::int, 9, 23)
+and
+make_date(extract(year from w.date)::int, 12, 20)
+then 'Autumn'
+else 'Winter'
+end as season,
+w.warning_record
+from w),
+d1 as (with d as ( select date, death_record from deaths_abroad da )
+select
+case
+when d.date between
+make_date(extract(year from d.date)::int, 3, 21)
+and
+make_date(extract(year from d.date)::int, 6, 20)
+then 'Spring'
+when d.date between
+make_date(extract(year from d.date)::int, 6, 21)
+and
+make_date(extract(year from d.date)::int, 9, 22)
+then 'Summer'
+when d.date between
+make_date(extract(year from d.date)::int, 9, 23)
+and
+make_date(extract(year from d.date)::int, 12, 20)
+then 'Autumn'
+else 'Winter'
+end as season,
+d.death_record
+from d ),
+d2 as (
+select season, count(death_record) as deaths
+from d1
+group by 1
+),
+w2 as(
+select season, count(warning_record) as warnings
+from w1
+group by 1
+)
+select d2.season, d2.deaths, w2.warnings from d2 join w2 on d2.season = w2.season
+ORDER BY array_position(array['Winter','Spring','Summer','Autumn'], d2.season);
+
+--7 Analyzing causes of death
+select cause_of_death, count(cause_of_death)as deaths
+from deaths_abroad da
+group by cause_of_death
+order by deaths desc;
+
+--8 Comparing terrorism deaths and warnings by country
+with
+totaldeaths as(
+select deaths_abroad.country_id, count (death_record) as deaths
+from deaths_abroad
+where cause_of_death = 'Terrorist Action'
+group by deaths_abroad.country_id
+--having count (death_record)>0
+order by deaths desc),
+totalwarnings as(
+select w.country_id, sum (warning_record) as totwarnings
+from warnings w
+group by w.country_id)
+select c.country_name, deaths, sum (warning_record) as warnings
+from
+totaldeaths
+left join
+warnings w
+on totaldeaths.country_id = w.country_id
+join countries c
+on totaldeaths.country_id = c.country_id
+group by c.country_name, totaldeaths.deaths
+order by deaths desc;
+
+--9 Comparing terrorism deaths and warnings by season
+with w1 as (with w as (select date, warning_record from warnings)
+select
+case
+when w.date between
+make_date(extract(year from w.date)::int, 3, 21)
+and
+make_date(extract(year from w.date)::int, 6, 20)
+then 'Spring'
+when w.date between
+make_date(extract(year from w.date)::int, 6, 21)
+and
+make_date(extract(year from w.date)::int, 9, 22)
+then 'Summer'
+when w.date between
+make_date(extract(year from w.date)::int, 9, 23)
+and
+make_date(extract(year from w.date)::int, 12, 20)
+then 'Autumn'
+else 'Winter'
+end as season,
+w.warning_record
+from w),
+d1 as (with d as ( select date, death_record from deaths_abroad da
+where cause_of_death = 'Terrorist Action' )
+select
+case
+when d.date between
+make_date(extract(year from d.date)::int, 3, 21)
+and
+make_date(extract(year from d.date)::int, 6, 20)
+then 'Spring'
+when d.date between
+make_date(extract(year from d.date)::int, 6, 21)
+and
+make_date(extract(year from d.date)::int, 9, 22)
+then 'Summer'
+when d.date between
+make_date(extract(year from d.date)::int, 9, 23)
+and
+make_date(extract(year from d.date)::int, 12, 20)
+then 'Autumn'
+else 'Winter'
+end as season,
+d.death_record
+from d ),
+d2 as (
+select season, count(death_record) as deaths
+from d1
+group by 1
+),
+w2 as(
+select season, count(warning_record) as warnings
+from w1
+group by 1
+)
+select d2.season, d2.deaths, w2.warnings from d2 join w2 on d2.season = w2.season
+ORDER BY array_position(array['Winter','Spring','Summer','Autumn'], d2.season);
+
+--10 Comparing terrorism deaths, warnings, and passengers over time
+with
+totaldeaths as(
+select extract (year from date) as year , count (death_record) as deaths
+from deaths_abroad da
+where cause_of_death = 'Terrorist Action'
+group by year
+having count (death_record)>0
+order by deaths desc),
+totalpass as(
+select extract (year from yearmonth) as year , sum (passengers) as passengers
+from flights f
+group by year),
+totalwarnings as(
+select extract (year from date) as year , sum (warning_record) as warnings
+from warnings w
+group by year)
+select de.year, de.deaths, w.warnings, pa.passengers
+from
+totaldeaths de
+join
+totalwarnings w
+on de.year = w.year
+join totalpass pa
+on de.year = pa.year
+group by de.year, de.deaths, w.warnings, pa.passengers
+order by de.year asc;
